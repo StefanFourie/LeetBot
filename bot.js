@@ -113,7 +113,7 @@ undefined, true, timezone
 );
 dailyJob.start();
 //daily job,  count today's star
-var dailyJob2 = cron.job("00 57 23 * * 1-7", function(){
+var dailyJob2 = cron.job("00 58 23 * * 1-7", function(){
   controller.storage.users.all(function(err, all) {
       afterOneDay(all, function(result) {
         bot.say({
@@ -670,11 +670,18 @@ function formatUptime(uptime) {
 controller.hears(['help', 'how do I'],
     'ambient,mention,#tds_dev_leetcode', function(bot, message) {
     bot.reply(message,
-        ':robot_face: I do not have advanced help yet, but you can send me a DM if you are trying to register or join in!');
+        ':robot_face: You can send me a DM if you are trying to register or join in! Or just send me a message saying `help`, and I\'ll give you a list of handy commands :)');
 });
 //help DM cmd
 controller.hears(['help', 'how do I'],
     'direct_message', function(bot, message) {
     bot.reply(message,
-        ':robot_face: Soon I\'ll be able to help you, but not just yet tho :man-facepalming:');
+        ':robot_face: Here are some commands you can use' +
+        '\n`my name is [slackname]` - register/update username (required for first time use)' +
+        '\n`signup [leetcode username]` - register leetcode account (required for first time use)' + 
+        '\n`update [leetcode username]` - update leetcode account' +
+        '\n`my progress` - show your current progress (week star, rank, submit history etc.)' +
+        '\n`status` - show team\'s progress (current stars and leaderboard)' +
+        '\n`who am i` - check user profile'
+      );
 });

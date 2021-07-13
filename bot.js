@@ -1,4 +1,9 @@
-if (!process.env.LEETBOT_KEY) {
+const LEETBOT_KEY = 'put Slack Key here';
+const CHANNEL_NAME = '#tds_dev_leetcode';
+const CHANNEL_NAME_LISTENING = 'ambient,direct_mention,#tds_dev_leetcode';
+const timezone = 'Africa/Johannesburg';
+
+if (!LEETBOT_KEY) {
     console.log('Error: Specify token in environment');
     process.exit(1);
 }
@@ -18,12 +23,11 @@ var controller = Botkit.slackbot({
     json_file_store: './json_database',
 });
 var bot = controller.spawn({
-    token: process.env.LEETBOT_KEY
+    token: LEETBOT_KEY
 }).startRTM();
 
 //init time schedule package "cron"
 var cron = require('cron');
-var timezone = 'America/new_york';
 
 var fs = require('fs');
 //hourly job, refresh each user's progress.
@@ -47,7 +51,7 @@ var hourlyJob = cron.job("0 */1 * * *", function(){
         return updateCurrentStatus(data, all, function(result) {
           // bot.say({
           //   text: result,
-          //   channel: '#leetbot',
+          //   channel: CHANNEL_NAME,
           // },function(err,res) {
           //   // handle error
           // });
@@ -89,7 +93,7 @@ var dailyJob = cron.job("00 55 23 * * 1-7", function(){
         return updateCurrentStatus(data, all, function(result) {
           // bot.say({
           //   text: result,
-          //   channel: '#leetbot',
+          //   channel: CHANNEL_NAME,
           // },function(err,res) {
           //   // handle error
           // });
@@ -115,7 +119,7 @@ var dailyJob2 = cron.job("00 57 23 * * 1-7", function(){
       afterOneDay(all, function(result) {
         bot.say({
           text: result,
-          channel: '#leetbot',
+          channel: CHANNEL_NAME,
         },function(err,res) {
           // handle error
         });
@@ -133,7 +137,7 @@ var weeklyJob = cron.job("00 59 23 * * 0", function(){
       afterOneWeek(all, function(result) {
         bot.say({
           text: result,
-          channel: '#leetbot',
+          channel: CHANNEL_NAME,
         },function(err,res) {
           // handle error
         });
@@ -145,12 +149,12 @@ undefined, true, timezone
 weeklyJob.start();
 
 //testing cmd here
-controller.hears(['day'], 'direct_message', function(bot, message) {
+controller.hears(['testing-command-day'], CHANNEL_NAME_LISTENING, function(bot, message) {
   controller.storage.users.all(function(err, all) {
       afterOneDay(all, function(result) {
         bot.say({
           text: result,
-          channel: '#leetbot',
+          channel: CHANNEL_NAME,
         },function(err,res) {
           // handle error
         });
@@ -158,12 +162,12 @@ controller.hears(['day'], 'direct_message', function(bot, message) {
     });
 });
 
-controller.hears(['week'], 'direct_message', function(bot, message) {
+controller.hears(['testing-command-week'], CHANNEL_NAME_LISTENING, function(bot, message) {
   controller.storage.users.all(function(err, all) {
       afterOneWeek(all, function(result) {
         bot.say({
           text: result,
-          channel: '#leetbot',
+          channel: CHANNEL_NAME,
         },function(err,res) {
           // handle error
         });
@@ -172,7 +176,7 @@ controller.hears(['week'], 'direct_message', function(bot, message) {
 });
 
 //my status cmd
-controller.hears(['status'], 'direct_message', function(bot, message) {
+controller.hears(['status'], CHANNEL_NAME_LISTENING, function(bot, message) {
   controller.storage.users.all(function(err, all) {
     //init with each user's url
     var urls = [];
@@ -201,7 +205,7 @@ controller.hears(['status'], 'direct_message', function(bot, message) {
   });
 });
 
-controller.hears(['my progress'], 'direct_message', function(bot, message) {
+controller.hears(['my progress'], 'direct_message,direct_mention', function(bot, message) {
   controller.storage.users.get(message.user, function(err, user) {
       var res = "";
       // console.log(user);
@@ -605,7 +609,7 @@ controller.hears(['add leetcode (.*)', 'update leetcode (.*)'], 'direct_message,
 });
 
 //shutdown cmd
-controller.hears(['shutdown'], 'direct_message,direct_mention,mention', function(bot, message) {
+controller.hears(['force-shutdown-leetbot'], 'direct_message,direct_mention,mention', function(bot, message) {
 
     bot.startConversation(message, function(err, convo) {
 

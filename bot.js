@@ -1,6 +1,5 @@
-const LEETBOT_KEY = 'put Slack Key here';
 const CHANNEL_NAME = '#tds_dev_leetcode';
-const CHANNEL_NAME_LISTENING = 'ambient,direct_mention,#tds_dev_leetcode';
+const CHANNEL_NAME_LISTENING = 'ambient,direct_message,mention,#tds_dev_leetcode';
 const timezone = 'Africa/Johannesburg';
 
 if (!LEETBOT_KEY) {
@@ -40,7 +39,7 @@ var hourlyJob = cron.job("0 */1 * * *", function(){
       })
       var getPage = urls.map(rp);
       var pages = Promise.all(getPage);
-      //create promise all to wait for all quesy to finish. Responses will have same order with promises
+      //create promise all to wait for all query to finish. Responses will have same order with promises
       pages.then(function(response) {
         return Promise.all(response.map(homeParser));
       }).then(function(json){
@@ -82,7 +81,7 @@ var dailyJob = cron.job("00 55 23 * * 1-7", function(){
       })
       var getPage = urls.map(rp);
       var pages = Promise.all(getPage);
-      //create promise all to wait for all quesy to finish. Responses will have same order with promises
+      //create promise all to wait for all query to finish. Responses will have same order with promises
       pages.then(function(response) {
         return Promise.all(response.map(homeParser));
       }).then(function(json){
@@ -185,7 +184,7 @@ controller.hears(['status'], CHANNEL_NAME_LISTENING, function(bot, message) {
     })
     var getPage = urls.map(rp);
     var pages = Promise.all(getPage);
-    //create promise all to wait for all quesy to finish. Responses will have same order with promises
+    //create promise all to wait for all query to finish. Responses will have same order with promises
     pages.then(function(response) {
       return Promise.all(response.map(homeParser));
     }).then(function(json){
@@ -205,7 +204,7 @@ controller.hears(['status'], CHANNEL_NAME_LISTENING, function(bot, message) {
   });
 });
 
-controller.hears(['my progress'], 'direct_message,direct_mention', function(bot, message) {
+controller.hears(['my progress'], CHANNEL_NAME_LISTENING, function(bot, message) {
   controller.storage.users.get(message.user, function(err, user) {
       var res = "";
       // console.log(user);
@@ -666,3 +665,16 @@ function formatUptime(uptime) {
     uptime = uptime + ' ' + unit;
     return uptime;
 }
+
+//help cmd
+controller.hears(['help', 'how do I'],
+    'ambient,mention,#tds_dev_leetcode', function(bot, message) {
+    bot.reply(message,
+        ':robot_face: I do not have advanced help yet, but you can send me a DM if you are trying to register or join in!');
+});
+//help DM cmd
+controller.hears(['help', 'how do I'],
+    'direct_message', function(bot, message) {
+    bot.reply(message,
+        ':robot_face: Soon I\'ll be able to help you, but not just yet tho :man-facepalming:');
+});

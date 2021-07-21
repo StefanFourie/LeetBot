@@ -1,6 +1,7 @@
 const { App } = require('@slack/bolt');
 require('dotenv').config();
 const os = require('os');
+const fs = require('fs');
 const puppeteer = require('puppeteer');
 const simpleStore = require('./simple_storage');
 let storage = new simpleStore({ path: './json_database' });
@@ -104,9 +105,6 @@ app.message(/^who am I/i, async ({ message, say }) => {
 });
 
 // Status for user
-
-// Try refactor old bot to include puppeteer in the homeParser func, simply to load appropriate pages once JS does it's thing
-// 2nd thought, promise.all it outside of where homeParser is called - replace the existing getPages type thing with puppeteer first [considering homeParser loads html for each page]
 app.message(/^status/i, async ({ message, say }) => {
     storage.users.all(function (err, all) {
         //init with each user's url
@@ -114,12 +112,9 @@ app.message(/^status/i, async ({ message, say }) => {
         all.forEach(function (node) {
             urls.push({ url: baseurl + '/' + node.leet });
         })
-        // var getPage = urls.map(rp);
-        // var pages = Promise.all(getPage);
         var pages = Promise.all(urls.map(puppetMaster));
         //create promise all to wait for all query to finish. Responses will have same order with promises
         pages.then(function (response) {
-            // console.log(response);
             return Promise.all(response.map(homeParser));
         }).then(function (json) {
             var objs = Promise.all(json.map(timeFilter));
@@ -142,33 +137,30 @@ var puppetMaster = async (url) => {
     console.log(url.url);
     let html;
     const browser = await puppeteer.launch();
+    const page = await browser.newPage();
     return new Promise(async (resolve, reject) => {
         try {
-            const page = await browser.newPage();
-            await page.setDefaultTimeout(10000);
+            // await page.setDefaultTimeout(5000);
             await page.goto(url.url);
-            // Wait for the heatmap to determine that page has loaded.
-            await page.waitForSelector('li.ant-list-item.css-nvdml7');
-            // Try catch the above await for a timeout (aka no posts or submissions)
+            // We have to wait for the JS to fully complete doing its magic before we can properly traverse & parse the dom.
+            // A 5s timeout was the most successful I found
+            await page.waitForTimeout(5000);
+            // await page.waitForSelector('li.ant-list-item.css-nvdml7');
+            // await page.waitForSelector('.css-lw67gk');
+            // await page.waitForNavigation({ waitUntil: "domcontentloaded" });
             html = await page.content();
-            await browser.close();
-            // fs.writeFileSync(`/home/calvin/Documents/TDS/LeetBot/someHTML_${url.url.split('.com/')[1]}.html`, html);
-            return resolve(html);
 
         } catch (error) {
-            // if (error instanceof TimeOutError) {
-            // TODO: Figure out how to handle users that have no submissions yet - PAIN
-            console.log(`Timed out waiting for selector on ${url.url}\n\nERROR: ${error}`);
+            // Theoretically with the forced 5s wait we shouldn't step into the catch, but we'll leave it here just in case
+            console.log(`Timed out waiting for ${url.url}\nERROR: ${error}`);
+            // Try again and just wait for the heatmap. Shouldn't break parsing
             await page.goto(url.url);
             await page.waitForSelector('.react-calendar-heatmap');
             html = await page.content();
-            // bot.botkit.debug(html);
             console.log('fetched page again: ' + url.url);
-            // } else {
-            //     console.log(`ERROR: ${error}`);
-            // }
         } finally {
             await browser.close();
+            // fs.writeFileSync(`/home/calvin/Documents/TDS/LeetBot/someHTML_${url.url.split('.com/')[1]}.html`, html);
             return resolve(html);
         }
 
@@ -183,49 +175,29 @@ var homeParser = function (html) {
     var status = [];
     return new Promise((resolve, reject) => {
 
-        if ($('.css-lw67gk') == null) {
-            console.log('No posts/submissions');
-        } else {
-            var element = $('.css-lw67gk');
-            console.log('ELEMENT:');
-            console.log(element);
-        }
-
         if ($('.ant-list-item.css-nvdml7') == null)
             console.log("leetcode homepage no found");
         else {
-            var list = $('.ant-list-item.css-nvdml7').parent();
-            // console.log(list);
+            // Following 3 lines traverse the dom, into the the appropriate parent element to iterate the list of submissions - DON'T TOUCH IT
+            var list = $('.css-lw67gk').first().next();
+            list = list.children().children().first().next();
+            list = list.children().children().children()
+            // var list = $('.ant-list-item.css-nvdml7').parent();
             list.children().each(function (i, ele) {
-                // console.log($(this).children().children().first().next().next().children().first().next().text());
-                //get all subject name and finsih time
+                //get all subject name and finish times, as well as acceptance state
                 links[i] = $(this).children().attr('href');
                 names[i] = $(this).children().children().first().text();
                 times[i] = $(this).children().children().first().next().text();
                 status[i] = $(this).children().children().first().next().next().children().first().next().text();
-                // .text().replace(/\r?\n|\r/g, " ").trim();
-            })
+            });
 
-            // if ($('h3:contains("recent 10 accepted")') == null)
-            //   return reject("leetcode homepage no found\n");
-            // else {
-            //   var list = $('h3:contains("recent 10 accepted")').parent().next();
-            //   list.children().each(function (i, ele) {
-            //     //get all subject name and finsih time
-            //     links[i] = $(this).attr('href');
-            //     names[i] = $(this).children().first().next().next().text();
-            //     times[i] = $(this).children().last().text().replace(/\r?\n|\r/g, " ").trim();
-            //   })
-            console.log(JSON.stringify({ "names": names, "times": times, "links": links, "status": status }));
+            // console.log(JSON.stringify({ "names": names, "times": times, "links": links, "status": status }));
             return resolve(JSON.stringify({ "names": names, "times": times, "links": links, "status": status }));
         }
     })
 }
 
 function updateCurrentStatus(lists, all, callback) {
-    // console.log(s)
-    // var obj = JSON.parse(s);
-    // console.log(obj);
     var result = "Today's progress:\n"
     for (var i = 0; i < lists.length; i++) {
         storage.users.get(all[i].id, function (err, user) {
@@ -245,7 +217,6 @@ function updateCurrentStatus(lists, all, callback) {
             }
             var names = lists[i][0];
             var links = lists[i][1];
-            // console.log(names);
             if (names != null) {
                 for (var k = 0; k < names.length; k++) {
                     if (!nameSet.has(names[k])) {
@@ -256,19 +227,16 @@ function updateCurrentStatus(lists, all, callback) {
                     }
                 }
             }
-            // console.log(count);
             user.todayCount += count;
             user.todayStar = countStars(user.todayCount);
             result += user.name + ": " + user.todayStar + " stars. Week total: " + user.weekStar + " stars.\n";
             storage.users.save(user, function (err, id) {
-                // console.log("before")
             });
         });
     }
     callback(result);
     return new Promise((resolve, reject) => {
         return resolve(all);
-        // return resolve([names, times, links]);
     })
 }
 
@@ -282,10 +250,10 @@ var timeFilter = function (json) {
         else {
             var nameSet = new Set();
             var times = obj.times;
-            //filter out those should be count as today's finish
+            // filter out those should be count as today's finish
             for (var i = 0; i < times.length; i++) {
                 // We only want accepted results to count towards stars
-                // if (obj.status[i] != 'Accepted') { continue; }
+                if (obj.status[i] != 'Accepted') { continue; }
                 // Filter out submissions not in the current day
                 if (times[i].indexOf("day") > -1 || times[i].indexOf("days") > -1 || times[i].indexOf("week") > -1 || times[i].indexOf("weeks") > -1
                     || times[i].indexOf("month") > -1 || times[i].indexOf("months") > -1 || times[i].indexOf("year") > -1 || times[i].indexOf("years") > -1) { }
@@ -293,19 +261,17 @@ var timeFilter = function (json) {
                     var now = new Date();
                     var end = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 23, 55, 00);
                     var s = times[i].replace(new RegExp(String.fromCharCode(160), "g"), " ");
-                    // console.log(s);
-                    //use regex to caculate how many ms ago
+                    // use regex to caculate how many ms ago
                     var hregex = /(\d+) hour/g;
                     var hour = hregex.exec(s);
                     var mregex = /(\d+) minute/g;
                     var min = mregex.exec(s);
                     var sregex = /(\d+) second/g;
                     var sec = sregex.exec(s);
-                    var max = now.getTime() - end.getTime();//how many ms have been after yesterday 23:55:00
+                    var max = now.getTime() - end.getTime();  // how many ms have been after yesterday 23:55:00
                     var escape = 1000 * ((hour == null ? 0 : hour[1] * 3600) + (min == null ? 0 : min[1] * 60) + (sec == null ? 0 : sec[1]));
-                    //if within max scope, this subject should be count as today's finish
+                    // if within max scope, this subject should be count as today's finish
                     if (escape < max) {
-                        // console.log("in")
                         if (!nameSet.has(obj.names[i])) {
                             nameSet.add(obj.names[i]);
                             names.push(obj.names[i]);
@@ -314,14 +280,13 @@ var timeFilter = function (json) {
                     }
                 }
             }
-            // return resolve(JSON.stringify({"names": names, "links":links}));
-            // return resolve({"names": names, "links":links});
+            // console.log([names, links]);
             return resolve([names, links]);
-            // return resolve("test");
         }
     })
 }
 
+// Arb calculation of stars
 function countStars(count) {
     var res = 0;
     if (count >= 10) {
@@ -362,6 +327,8 @@ app.message(/^my progress/i, async ({ message, context, say }) => {
                 })
             }
             say(res);
+        } else {
+            say("I don't have your details, please DM with the `help` command to get started.");
         }
     });
 });
@@ -400,6 +367,6 @@ function formatUptime(uptime) {
     // Start your app
     await app.start(process.env.PORT || 3000);
 
-    console.log('⚡️ Bolt app is running!');
+    console.log('LeetBot is running!');
 })();
 

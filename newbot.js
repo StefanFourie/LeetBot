@@ -372,27 +372,34 @@ app.message(/^uptime|who are you/i, async ({ message, context, say }) => {
 
     await say(
         `:robot_face: I am a bot named <@${context.botUserId}>.\n` +
-        `I have been running for ${uptime} on ${hostname}.`
+        `I have been running for \`${uptime}\` on ${hostname}.`
     );
 });
 
-function formatUptime(uptime) {
-    var unit = 'second';
-    if (uptime > 60) {
-        uptime = uptime / 60;
-        unit = 'minute';
-    }
-    if (uptime > 60) {
-        uptime = uptime / 60;
-        unit = 'hour';
-    }
-    if (uptime != 1) {
-        unit = unit + 's';
-    }
+function formatUptime(rawUptime) {
+    // https://stackoverflow.com/a/55164534
+    // console.log("Uptime raw:", rawUptime)
+    const date = new Date(rawUptime * 1000);
+    const days = date.getUTCDate() - 1,
+        hours = date.getUTCHours(),
+        minutes = date.getUTCMinutes(),
+        seconds = date.getUTCSeconds();
+    // milliseconds = date.getUTCMilliseconds();
 
-    uptime = uptime + ' ' + unit;
-    return uptime;
+    let segments = [];
+
+    // Format the uptime string. 	
+    if (days > 0) segments.push(days + ' day' + ((days == 1) ? '' : 's'));
+    if (hours > 0) segments.push(hours + ' hour' + ((hours == 1) ? '' : 's'));
+    if (minutes > 0) segments.push(minutes + ' minute' + ((minutes == 1) ? '' : 's'));
+    if (seconds > 0) segments.push(seconds + ' second' + ((seconds == 1) ? '' : 's'));
+    // if (milliseconds > 0) segments.push(milliseconds + ' millisecond' + ((seconds == 1) ? '' : 's'));
+    const dateString = segments.join(', ');
+
+    // console.log("Uptime: " + dateString);
+    return dateString;
 }
+
 
 //hourly job, refresh each user's progress.
 var hourlyJob = cron.job("0 */1 * * *", function () {

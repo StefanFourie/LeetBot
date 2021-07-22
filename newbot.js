@@ -2,12 +2,15 @@ const { App } = require('@slack/bolt');
 require('dotenv').config();
 const os = require('os');
 const fs = require('fs');
+const cron = require('cron');
 const puppeteer = require('puppeteer');
 const simpleStore = require('./simple_storage');
 let storage = new simpleStore({ path: './json_database' });
 let baseurl = 'https://leetcode.com';
 const cheerio = require('cheerio');
 const timezone = 'Africa/Johannesburg';
+const TDS_DEV_LEETCODE = process.env.TDS_DEV_LEETCODE;
+const TEST_CHANNEL = process.env.TEST_CHANNEL;
 
 
 // Initializes your app with your bot token and signing secret
@@ -18,8 +21,36 @@ const app = new App({
     appToken: process.env.SLACK_APP_TOKEN
 });
 
+app.message('testing-command-day', () => {
+    storage.users.all(function (err, all) {
+        afterOneDay(all, function (result) {
+            app.client.chat.postMessage({
+                text: result,
+                channel: TEST_CHANNEL,
+            }, function (err, res) {
+                // handle error
+                console.error(err);
+            });
+        });
+    });
+});
+
+app.message('testing-command-week', () => {
+    storage.users.all(function (err, all) {
+        afterOneWeek(all, function (result) {
+            app.client.chat.postMessage({
+                text: result,
+                channel: TEST_CHANNEL,
+            }, function (err, res) {
+                // handle error
+                console.error(err);
+            });
+        });
+    });
+});
+
 // Listens to incoming messages that contain "Hi/Hello/Hey". Case insensitive
-app.message(/^(hi|hello|hey).*/i, async ({ message, say }) => {
+app.message(/^hi|hello|hey.*/i, async ({ message, say }) => {
     // say() sends a message to the channel where the event was triggered
     app.client.reactions.add(
         {
@@ -361,6 +392,183 @@ function formatUptime(uptime) {
 
     uptime = uptime + ' ' + unit;
     return uptime;
+}
+
+//hourly job, refresh each user's progress.
+var hourlyJob = cron.job("0 */1 * * *", function () {
+    storage.users.all(function (err, all) {
+        //init with each user's url
+        var urls = [];
+        all.forEach(function (node) {
+            urls.push({ url: baseurl + '/' + node.leet });
+        })
+        var pages = Promise.all(urls.map(puppetMaster));
+        //create promise all to wait for all query to finish. Responses will have same order with promises
+        pages.then(function (response) {
+            return Promise.all(response.map(homeParser));
+        }).then(function (json) {
+            var objs = Promise.all(json.map(timeFilter));
+            return objs;
+        })
+            .then(data => {
+                return updateCurrentStatus(data, all, function (result) {
+                    // bot.say({
+                    //   text: result,
+                    //   channel: CHANNEL_NAME,
+                    // },function(err,res) {
+                    //   // handle error
+                    // });
+                });
+            }).then(data => {
+                fs.appendFile("./log/cronlog", new Date() + "run hourlyJob\n", function (err) {
+                    if (err) {
+                        return console.log(err);
+                    }
+                });
+            })
+            .catch(function (error) {
+                console.error(error);
+            });
+    });
+},
+    undefined, true, timezone
+);
+hourlyJob.start();
+
+//daily job, refresh each user's progress before star counting
+//00 55 23 * * 1-7 for everyday's 23:55, */10 * * * * * for every 10 sec
+var dailyJob = cron.job("00 55 23 * * 1-7", function () {
+    storage.users.all(function (err, all) {
+        //init with each user's url
+        var urls = [];
+        all.forEach(function (node) {
+            urls.push({ url: baseurl + '/' + node.leet });
+        })
+        var pages = Promise.all(urls.map(puppetMaster));
+        //create promise all to wait for all query to finish. Responses will have same order with promises
+        pages.then(function (response) {
+            return Promise.all(response.map(homeParser));
+        }).then(function (json) {
+            var objs = Promise.all(json.map(timeFilter));
+            return objs;
+        })
+            .then(data => {
+                return updateCurrentStatus(data, all, function (result) {
+                    // app.client.chat.postMessage({
+                    //   text: result,
+                    //   channel: CHANNEL_NAME,
+                    // },function(err,res) {
+                    //   // handle error
+                    // console.error(err);
+                    // });
+                });
+            }).then(data => {
+                fs.appendFile("./log/cronlog", new Date() + "run dailyJob\n", function (err) {
+                    if (err) {
+                        return console.log(err);
+                    }
+                });
+            })
+            .catch(function (error) {
+                console.error(error);
+            });
+    });
+},
+    undefined, true, timezone
+);
+dailyJob.start();
+
+// daily job,  count today's star
+var dailyJob2 = cron.job("00 58 23 * * 1-7", function () {
+    storage.users.all(function (err, all) {
+        afterOneDay(all, function (result) {
+            app.client.chat.postMessage({
+                text: result,
+                channel: TEST_CHANNEL,
+            }, function (err, res) {
+                // handle error
+                console.error(err);
+            });
+        });
+    });
+},
+    undefined, true, timezone
+);
+dailyJob2.start();
+
+//00 59 23 * * 7
+// weekly job, count week's star, give leaderboard
+var weeklyJob = cron.job("00 59 23 * * 0", function () {
+    storage.users.all(function (err, all) {
+        afterOneWeek(all, function (result) {
+            app.client.chat.postMessage({
+                text: result,
+                channel: TEST_CHANNEL,
+            }, function (err, res) {
+                // handle error
+                console.error(err);
+            });
+        });
+    });
+},
+    undefined, true, timezone
+);
+weeklyJob.start();
+
+function afterOneDay(all, callback) {
+    // console.log("in afterOneDay");
+    var result = "Today's progress:\n"
+
+    var index = 1;
+    //Sort all user's weekStar, init the leadborad.
+    all.sort(function (a, b) { return (b.weekStar + b.todayStar) - (a.weekStar + a.todayStar); });
+    all.forEach(function (node) {
+        storage.users.get(node.id, function (err, user) {
+            result += index++ + ". " + user.name + ": " + user.todayStar + " stars. Week total: ";
+            var ws = user.weekStar + user.todayStar;
+            user.weekStar = ws;
+            user.todayStar = 0;
+            user.todayCount = 0;
+            user.oldSubmissions = user.todaySubmissions;
+            user.todaySubmissions = [];
+            user.oldLinks = user.todayLinks;
+            user.todayLinks = [];
+            user.weekRank = index - 1;
+            result += ws + " stars.\n";
+            storage.users.save(user, function (err, id) {
+            });
+            fs.appendFile("./log/dayStarLog", new Date() + ": " + user.name + ", " + user.weekStar + "\n", function (err) {
+                if (err) {
+                    return console.log(err);
+                }
+            });
+        });
+    })
+    callback(result);
+}
+
+function afterOneWeek(all, callback) {
+    // console.log("in afterOneWeek");
+    var result = "This week's leaderboard:\n";
+    var index = 1;
+    //Sort all user's weekStar, init the leadborad.
+    all.sort(function (a, b) { return (b.weekStar + b.todayStar) - (a.weekStar + b.todayStar); });
+    all.forEach(function (node) {
+        storage.users.get(node.id, function (err, user) {
+            user.star += user.weekStar;
+            user.weekStar = 0;
+            user.weekRank = 0;
+            result += index++ + ". " + node.name + ", " + node.weekStar + " stars.\n";
+            storage.users.save(user, function (err, id) {
+            });
+            fs.appendFile("./log/weekStarLog", new Date() + ": " + user.name + ", " + user.star + " rank:" + index - 1 + "\n", function (err) {
+                if (err) {
+                    return console.log(err);
+                }
+            });
+        });
+    })
+    callback(result);
 }
 
 (async () => {

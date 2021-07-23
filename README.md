@@ -1,73 +1,93 @@
-#Leetbot
+# Leetbot
 
-Leetbot is a bot that can trace your leecode progress, and compete it with your teammates on slack. It will update the leaderboard daily, and count each week's result.
+<!-- Leetbot is a bot that can trace your leecode progress, and compete it with your teammates on slack. It will update the leaderboard daily, and count each week's result. -->
 
+Leetbot is a bot that can track your LeetCode progress, and allow you to compare yourself against your teammates on Slack. The leaderboard is updated daily, and counts towards each weeks result.
 
-### Deployment
+### Deployment:
 
-Our program should always be running so we strongly recommend that all the following operation should be done on a cloud machine(e.g. AWS EC2).
+<!-- The bot should always be running so it is strongly recommend that all the following operation should be done on a cloud machine(e.g. AWS EC2). -->
 
-#### Install code.
+The bot should always be running, so it is strongly recommended that the bot be hosted on a server or cloud machine.
+
+#### Install the Code:
 
 ```bash
-git clone https://github.com/LakeGap/LeetBot.git
+git clone https://github.com/StefanFourie/LeetBot.git
 cd LeetBot
 npm install
 ```
-#### Update Slack bot token.
 
-1. [Create a new slack team](https://slack.com).
+#### Setting the Bot up:
 
-2. Create a bot team member. Click [/services/new/bot](https://my.slack.com/services/new/bot). For more information about bot-users, see [documentation](https://api.slack.com/bot-users).
+1. If you don't already have one, [create a new slack workspace](https://slack.com).
 
-3. Copy slack bot token.
+2. Create a new bot app. Click [here](https://api.slack.com/apps/new). For more information about Slack Bots/Apps, see the [documentation](https://api.slack.com/#read_the_docs).
 
-4. Update environment variables "LEETBOT_KEY" to your bot token on your own cloud machine.
+3. Configure your app as follows:
 
-   In windows, just run:
+   - Enable Socket Mode with the `connections:write` scope. Keep the generated App Token handy.
+   - Enable Interactivity if not already enabled.
+   - Grant the following OAuth & Permission scopes:
+     - ```
+       channels:history
+       chat:write
+       groups:history
+       im:history
+       im:write
+       mpim:history
+       reactions:write
+       ```
+   - Enable Event Subscriptions and subscribe to the following events:
+     - ```
+       message.channels
+       message.groups
+       message.im
+       message.mpim
+       ```
+   - Enable the Messages Tab, found under App Home
+   - Depending on whether you previously installed the bot to your chosen workspace, you can now install/reinstall the bot to the workspace.
 
-   ```
-   setx LEETBOT_KEY "<slackbot-token>"
-   # You will then need to close the cmd window and reopen.
-   ```
-   In other systems, we can set them in your shell, like in `.bash_profile`:
+4. Rename the `example.env` to `.env` and add your credentials and tokens into the provided fields.
+   - `SLACK_BOT_TOKEN` : Found under the OAuth & Permissions tab
+   - `SLACK_SIGNING_SECRET` : Found under the Basic Information tab
+   - `SLACK_APP_TOKEN` : Found under the Basic Information tab > App-Level Tokens section. Click on the named Token to access it.
+   - `PORT` : The port your app will run and listen on
+   - `CHANNEL` : Leaderboards will be posted to a dedicated Slack channel, please get the ID
+   - `DB_NAME` : Default name for the JSON file database. Can be changed.
 
-   ```
-   # Edit .bash_profile to have:
-   export LEETBOT_KEY ="<slackbot-token>"
-   # Then reload
-   $ source ~/.bash_profile
-   ```
+#### Running the Code:
 
-#### Run the code.
-Run the command on your cloud machine.
+Run the command on your cloud or local machine.
+
 ```
-node bot.js
+node newbot.js
 ```
 
-### Configuration and Usage
-Use direct message to your bot to configure/register yourself/check progress.
-#### command introduction:
+### Configuration and Usage:
 
-| Format        | Usage           |
-| ------------- |:-------------:|
-| my name is [slackname]      | register/update username (required for first time use) |
-| signup [leetcode username]      | register leetcode account (required for first time use)      |
-| update [leetcode username] | update leetcode account      |
-| my progress  | show user's current progress (week star, rank, submit history etc.)  |
-| status | show team's progress (current stars and leaderboard)     |
-| who am i  | check user profile     |
+Use direct messages to your bot to configure/register yourself and check your progress.
 
-one conversations example:
-![](./img/myname.png)
-![](./img/hi.png)
-![](./img/signup.png)
-![](./img/update.png)
-![](./img/whoami.png)
-![](./img/whoareu.png)
+#### Available Commands:
 
-### Contribution
-This bot is still under test within my own leetcode coding group, anyone are welcome to contribute. Here is something I want to do next:
-1. Add a GitHub module that can automatically upload your daily submits to GitHub repo.
-2. Develop a interface that allow people to upload their slack bot token, provide bot service for their bot.
-3. Code refactory, develop API, publish this bot as a npm package.
+| Format                     |                            What it does                             |
+| -------------------------- | :-----------------------------------------------------------------: |
+| call me [your name]        |       register/update username (required for first time use)        |
+| signup [LeetCode username] |       register LeetCode account (required for first time use)       |
+| my progress                | show user's current progress (week star, rank, submit history etc.) |
+| status                     |        show team's progress (current stars and leaderboard)         |
+| who am I                   |                         check user profile                          |
+| help                       |         sends a list of available commands and what they do         |
+
+<!-- | update [LeetCode username] | update LeetCode account      | -->
+
+### Notes
+
+The Bot uses a module from BotKit v0.7 called `simple_storage` that writes the stored info for each user to a JSON file. The name for this "database" can be configured in the .env file (`DB_NAME`), and is by default created in the project root directory.
+
+### Further Reading & Tutorials
+
+- [Bolt for JavaScript](https://slack.dev/bolt-js/concepts)
+- [Getting Started with Bolt for JS (Socket Mode)](https://slack.dev/bolt-js/tutorial/getting-started)
+- [Getting Started with Bolt for JS (HTTP Mode)](https://slack.dev/bolt-js/tutorial/getting-started-http)
+- [Block Kit](https://api.slack.com/block-kit)

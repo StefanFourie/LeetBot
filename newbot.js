@@ -4,13 +4,12 @@ const os = require('os');
 const fs = require('fs');
 const cron = require('cron');
 const simpleStore = require('./simple_storage');
-let storage = new simpleStore({ path: './json_database' });
 let baseurl = 'https://leetcode.com';
 const timezone = 'Africa/Johannesburg';
 // const CHANNEL = process.env.TDS_DEV_LEETCODE;
 const CHANNEL = process.env.CHANNEL;
 const { puppetMaster, timeFilter, countStars, homeParser, formatUptime } = require('./helpers');
-
+const storage = new simpleStore({ path: `./${process.env.DB_NAME}` });
 
 // Initializes your app with your bot token and signing secret
 const app = new App({
@@ -49,7 +48,7 @@ const app = new App({
 // });
 
 // Listens to incoming messages that contain "Hi/Hello/Hey". Case insensitive
-app.message(/^hi|hello|hey.*/i, async ({ message, say }) => {
+app.message(/^hi|hello|hey|sup|howzit|greetings.*/i, async ({ message, say }) => {
     // say() sends a message to the channel where the event was triggered
     app.client.reactions.add(
         {

@@ -1,9 +1,10 @@
 const puppeteer = require('puppeteer');
 const cheerio = require('cheerio');
 // const fs = require('fs');
+const logger = require('./logger');
 
 const puppetMaster = async (url) => {
-    console.log(url.url);
+    logger.debug(url.url);
     let html;
     const browser = await puppeteer.launch();
     const page = await browser.newPage();
@@ -21,12 +22,12 @@ const puppetMaster = async (url) => {
 
         } catch (error) {
             // Theoretically with the forced 5s wait we shouldn't step into the catch, but we'll leave it here just in case
-            console.log(`Timed out waiting for ${url.url}\nERROR: ${error}`);
+            logger.warn(`Timed out waiting for ${url.url}\nERROR: ${error}`);
             // Try again and just wait for the heatmap. Shouldn't break parsing
             await page.goto(url.url);
             await page.waitForSelector('.react-calendar-heatmap');
             html = await page.content();
-            console.log('fetched page again: ' + url.url);
+            logger.info('fetched page again: ' + url.url);
         } finally {
             await browser.close();
             // fs.writeFileSync(`/home/calvin/Documents/TDS/LeetBot/someHTML_${url.url.split('.com/')[1]}.html`, html);
@@ -44,7 +45,7 @@ const homeParser = (html) => {
     return new Promise((resolve, reject) => {
 
         if ($('.ant-list-item.css-nvdml7') == null)
-            console.log("leetcode homepage no found");
+            logger.error("leetcode homepage no found");
         else {
             // Following 3 lines traverse the dom, into the the appropriate parent element to iterate the list of submissions - DON'T TOUCH IT
             var list = $('.css-lw67gk').first().next();
@@ -59,7 +60,7 @@ const homeParser = (html) => {
                 status[i] = $(this).children().children().first().next().next().children().first().next().text();
             });
 
-            // console.log(JSON.stringify({ "names": names, "times": times, "links": links, "status": status }));
+            // logger.debug(JSON.stringify({ "names": names, "times": times, "links": links, "status": status }));
             return resolve(JSON.stringify({ "names": names, "times": times, "links": links, "status": status }));
         }
     })
@@ -105,7 +106,7 @@ const timeFilter = (json) => {
                     }
                 }
             }
-            // console.log([names, links]);
+            // logger.debug([names, links]);
             return resolve([names, links]);
         }
     })
@@ -131,7 +132,7 @@ const countStars = (count) => {
 
 const formatUptime = (rawUptime) => {
     // https://stackoverflow.com/a/55164534
-    // console.log("Uptime raw:", rawUptime)
+    // logger.debug("Uptime raw:", rawUptime)
     const date = new Date(rawUptime * 1000);
     const days = date.getUTCDate() - 1,
         hours = date.getUTCHours(),
@@ -149,7 +150,7 @@ const formatUptime = (rawUptime) => {
     // if (milliseconds > 0) segments.push(milliseconds + ' millisecond' + ((seconds == 1) ? '' : 's'));
     const dateString = segments.join(', ');
 
-    // console.log("Uptime: " + dateString);
+    // logger.debug("Uptime: " + dateString);
     return dateString;
 }
 

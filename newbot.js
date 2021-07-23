@@ -10,6 +10,7 @@ const timezone = 'Africa/Johannesburg';
 const CHANNEL = process.env.CHANNEL;
 const { puppetMaster, timeFilter, countStars, homeParser, formatUptime } = require('./helpers');
 const storage = new simpleStore({ path: `./${process.env.DB_NAME}` });
+const logger = require('./logger');
 
 // Initializes your app with your bot token and signing secret
 const app = new App({
@@ -27,7 +28,7 @@ const app = new App({
 //                 channel: CHANNEL,
 //             }, function (err, res) {
 //                 // handle error
-//                 console.error(err);
+//                 logger.error(err);
 //             });
 //         });
 //     });
@@ -41,7 +42,7 @@ const app = new App({
 //                 channel: CHANNEL,
 //             }, function (err, res) {
 //                 // handle error
-//                 console.error(err);
+//                 logger.error(err);
 //             });
 //         });
 //     });
@@ -173,10 +174,10 @@ app.message(/^status/i, async ({ message, say }) => {
                     say(result);
                 });
             }).then(data => {
-                // console.log(data);
+                // logger.debug(data);
             })
             .catch(function (error) {
-                console.log(error);
+                logger.error(error);
             });
     });
 });
@@ -187,7 +188,7 @@ app.message(/^status/i, async ({ message, say }) => {
 app.message(/^my progress/i, async ({ message, context, say }) => {
     storage.users.get(message.user, function (err, user) {
         var res = "";
-        // console.log(user);
+        // logger.debug(user);
         if (user && user.name) {
             res += 'Hello ' + user.name + '\n';
             res += "Today's finishes: " + user.todayCount + ", which stands for " + user.todayStar + " stars \n";
@@ -226,6 +227,7 @@ app.message(/^uptime|who are you/i, async ({ message, context, say }) => {
 
 //hourly job, refresh each user's progress.
 var hourlyJob = cron.job("0 */1 * * *", function () {
+    logger.info('Running hourly cron');
     storage.users.all(function (err, all) {
         //init with each user's url
         var urls = [];
@@ -252,12 +254,12 @@ var hourlyJob = cron.job("0 */1 * * *", function () {
             }).then(data => {
                 fs.appendFile("./log/cronlog", new Date() + ": run hourlyJob\n", function (err) {
                     if (err) {
-                        return console.log(err);
+                        return logger.error(err);
                     }
                 });
             })
             .catch(function (error) {
-                console.error(error);
+                logger.error(error);
             });
     });
 },
@@ -268,6 +270,7 @@ hourlyJob.start();
 //daily job, refresh each user's progress before star counting
 //00 55 23 * * 1-7 for everyday's 23:55, */10 * * * * * for every 10 sec
 var dailyJob = cron.job("00 55 23 * * 1-7", function () {
+    logger.info('Running daily cron 1');
     storage.users.all(function (err, all) {
         //init with each user's url
         var urls = [];
@@ -289,18 +292,18 @@ var dailyJob = cron.job("00 55 23 * * 1-7", function () {
                     //   channel: CHANNEL,
                     // },function(err,res) {
                     //   // handle error
-                    // console.error(err);
+                    // logger.error(err);
                     // });
                 });
             }).then(data => {
                 fs.appendFile("./log/cronlog", new Date() + ": run dailyJob\n", function (err) {
                     if (err) {
-                        return console.log(err);
+                        return logger.error(err);
                     }
                 });
             })
             .catch(function (error) {
-                console.error(error);
+                logger.error(error);
             });
     });
 },
@@ -310,6 +313,7 @@ dailyJob.start();
 
 // daily job,  count today's star
 var dailyJob2 = cron.job("00 58 23 * * 1-7", function () {
+    logger.info('Running daily cron 2');
     storage.users.all(function (err, all) {
         afterOneDay(all, function (result) {
             app.client.chat.postMessage({
@@ -317,7 +321,7 @@ var dailyJob2 = cron.job("00 58 23 * * 1-7", function () {
                 channel: CHANNEL,
             }, function (err, res) {
                 // handle error
-                console.error(err);
+                logger.error(err);
             });
         });
     });
@@ -329,6 +333,7 @@ dailyJob2.start();
 //00 59 23 * * 7
 // weekly job, count week's star, give leaderboard
 var weeklyJob = cron.job("00 59 23 * * 0", function () {
+    logger.info('Running weekly cron');
     storage.users.all(function (err, all) {
         afterOneWeek(all, function (result) {
             app.client.chat.postMessage({
@@ -336,7 +341,7 @@ var weeklyJob = cron.job("00 59 23 * * 0", function () {
                 channel: CHANNEL,
             }, function (err, res) {
                 // handle error
-                console.error(err);
+                logger.error(err);
             });
         });
     });
@@ -346,7 +351,7 @@ var weeklyJob = cron.job("00 59 23 * * 0", function () {
 weeklyJob.start();
 
 function afterOneDay(all, callback) {
-    // console.log("in afterOneDay");
+    // logger.debug("in afterOneDay");
     var result = "Today's progress:\n"
 
     var index = 1;
@@ -369,7 +374,7 @@ function afterOneDay(all, callback) {
             });
             fs.appendFile("./log/dayStarLog", new Date() + ": " + user.name + ", " + user.weekStar + "\n", function (err) {
                 if (err) {
-                    return console.log(err);
+                    return logger.error(err);
                 }
             });
         });
@@ -378,7 +383,7 @@ function afterOneDay(all, callback) {
 }
 
 function afterOneWeek(all, callback) {
-    // console.log("in afterOneWeek");
+    // logger.debug("in afterOneWeek");
     var result = "This week's leaderboard:\n";
     var index = 1;
     //Sort all user's weekStar, init the leadborad.
@@ -393,7 +398,7 @@ function afterOneWeek(all, callback) {
             });
             fs.appendFile("./log/weekStarLog", new Date() + ": " + user.name + ", " + user.star + " rank:" + index - 1 + "\n", function (err) {
                 if (err) {
-                    return console.log(err);
+                    return logger.error(err);
                 }
             });
         });
@@ -448,6 +453,6 @@ function updateCurrentStatus(lists, all, callback) {
     // Start your app
     await app.start(process.env.PORT || 3000);
 
-    console.log('LeetBot is running!');
+    logger.info('LeetBot is running!');
 })();
 

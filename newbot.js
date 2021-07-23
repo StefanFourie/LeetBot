@@ -116,7 +116,9 @@ app.message(/^help/i, async ({ message, context, say }) => {
         // DM message - provides commands
         await say(
             ':robot_face: Here are some commands you can use:\n' +
+            'Start with your name (for the leaderboard):\n' +
             '`my name is [your name]` OR `call me [your name]` - register/update your name for the leaderboard\n' +
+            'Then register your LeetCode account with me:\n' +
             '`signup [LeetCode username]` OR `register [LeetCode username]` - register or update LeetCode account\n' +
             // '`update [LeetCode username]` - update LeetCode username\n' +
             '`my progress` - show your current progress (week star, rank, submit history etc.)\n' +

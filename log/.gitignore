@@ -1,0 +1,3 @@
+# We want this directory on the remote, just not the content
+*
+!.gitignore
